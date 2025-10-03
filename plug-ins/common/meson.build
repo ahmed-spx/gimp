@@ -24,7 +24,7 @@ common_plugins_list = [
   },
   { 'name': 'file-csource', },
   { 'name': 'file-dicom', },
-  { 'name': 'file-farbfeld', },
+  { 'name': 'file-dpx', },
   { 'name': 'file-gbr', },
   { 'name': 'file-gegl', },
   { 'name': 'file-gif-load',
