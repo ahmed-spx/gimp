@@ -180,12 +180,13 @@ load_image (GFile        *file,
   GimpImage  *image  = NULL;
   GimpLayer  *layer;
   GeglBuffer *buffer;
-  guint16    *pixels;
+  //Change
+  guchar    *pixels;
   guchar      magic_number[4];
   guint32     width;
   guint32     height;
   gsize       row_size;
-  const Babl *format = babl_format ("R'G'B'A u16");
+  const Babl *format = babl_format ("R'G'B'A u8");
   FILE       *fp;
 
   fp = g_fopen (g_file_peek_path (file), "rb");
@@ -207,7 +208,7 @@ load_image (GFile        *file,
       return NULL;
     }
 
-  /*if (fseek(fp, 772, SEEK_SET) != 0)
+  if (fseek(fp, 772, SEEK_SET) != 0)
     {
       g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
                    _("Failed to seek to Dpx image dimensions"));
@@ -228,7 +229,8 @@ load_image (GFile        *file,
 
   if (width > GIMP_MAX_IMAGE_SIZE  ||
       height > GIMP_MAX_IMAGE_SIZE ||
-      ! g_size_checked_mul (&row_size, width, (sizeof (guint16) * 4)))
+      //Change
+      ! g_size_checked_mul (&row_size, width, (sizeof (guchar) * 4)))
     {
       g_set_error (error, GIMP_PLUG_IN_ERROR, 0,
                    _("Image dimensions too large: width %d x height %d"),
@@ -237,8 +239,9 @@ load_image (GFile        *file,
       return NULL;
     }
 
+    //Change
   image = gimp_image_new_with_precision (width, height, GIMP_RGB,
-                                         GIMP_PRECISION_U16_NON_LINEAR);
+                                         GIMP_PRECISION_U8_NON_LINEAR);
 
   layer = gimp_layer_new (image, _("Background"), width, height,
                           GIMP_RGBA_IMAGE, 100,
@@ -256,6 +259,37 @@ load_image (GFile        *file,
     }
 
   buffer = gimp_drawable_get_buffer (GIMP_DRAWABLE (layer));
+  //Trying to jump to offset 4, and read the pixel image offset from there
+guint32 pixel_data_offset;
+guint32 pixel_data_offset_be;
+
+
+    if (fseek(fp, 4, SEEK_SET) != 0)
+    {
+      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   _("Failed to seek to Dpx pixel data"));
+      fclose (fp);
+      return NULL;
+    }
+    if(fread(&pixel_data_offset_be, sizeof(guint32), 1, fp) != 1)
+    {
+      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   _("Failed to read Dpx pixel data offset"));
+      fclose (fp);
+      return NULL;
+    }
+
+  pixel_data_offset = GUINT32_FROM_BE (pixel_data_offset_be);
+
+
+     if(fseek(fp, (long)pixel_data_offset, SEEK_SET) != 0)
+    {
+      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   _("Failed to seek to Dpx pixel data"));
+      fclose (fp);
+      return NULL;
+    }
+
   for (gint i = 0; i < height; i++)
     {
       if (! fread (pixels, row_size, 1, fp))
@@ -276,6 +310,6 @@ load_image (GFile        *file,
 
   fclose (fp);
   g_object_unref (buffer);
-*/
+
   return image;
 }
