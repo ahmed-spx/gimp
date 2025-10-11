@@ -207,7 +207,8 @@ load_image (GFile        *file,
       return NULL;
     }
 
-  /*if (fseek(fp, 772, SEEK_SET) != 0)
+  /* Offset to Image Data */
+  if (fseek(fp, 4, SEEK_SET) != 0)
     {
       g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
                    _("Failed to seek to Dpx image dimensions"));
@@ -223,7 +224,7 @@ load_image (GFile        *file,
       return NULL;
     }
 
-  width = GUINT32_FROM_BE (width);
+  /*width = GUINT32_FROM_BE (width);
   height = GUINT32_FROM_BE (height);
 
   if (width > GIMP_MAX_IMAGE_SIZE  ||
