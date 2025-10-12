@@ -3,7 +3,7 @@
  *
  *   Dpx Image Format plug-in
  *
- *   Copyright (C) 2023 Alex S.
+ *   Copyright (C) 2025 Ahmed, Brian, Domingo, Jax.
  *
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -128,9 +128,11 @@ dpx_create_procedure (GimpPlugIn  *plug_in,
                                           "format"),
                                         name);
       gimp_procedure_set_attribution (procedure,
-                                      "Alex S.",
-                                      "Alex S.",
-                                      "2023");
+                                      "Ahmed A.",
+                                      "Brian J.",
+                                      "Domingo ",
+                                      "Jax G.",
+                                      "2025");
 
       gimp_file_procedure_set_extensions (GIMP_FILE_PROCEDURE (procedure),
                                           "dpx");
@@ -207,7 +209,7 @@ load_image (GFile        *file,
       return NULL;
     }
 
-  /*if (fseek(fp, 772, SEEK_SET) != 0)
+  if (fseek(fp, 4, SEEK_SET) != 0)
     {
       g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
                    _("Failed to seek to Dpx image dimensions"));
