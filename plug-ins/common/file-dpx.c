@@ -128,7 +128,7 @@ dpx_create_procedure (GimpPlugIn  *plug_in,
                                           "format"),
                                         name);
       gimp_procedure_set_attribution (procedure,
-                                      "Ahmed A., Brian J., Domingo, Jax G.",
+                                      "Ahmed A., Brian R., Domingo, Jax G.",
                                       "Copyright 2025",
                                       "Gimp 3.1");
 
