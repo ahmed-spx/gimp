@@ -128,11 +128,9 @@ dpx_create_procedure (GimpPlugIn  *plug_in,
                                           "format"),
                                         name);
       gimp_procedure_set_attribution (procedure,
-                                      "Ahmed A.",
-                                      "Brian J.",
-                                      "Domingo ",
-                                      "Jax G.",
-                                      "2025");
+                                      "Ahmed A., Brian J., Domingo, Jax G.",
+                                      "Copyright 2025",
+                                      "Gimp 3.1");
 
       gimp_file_procedure_set_extensions (GIMP_FILE_PROCEDURE (procedure),
                                           "dpx");
@@ -208,14 +206,33 @@ load_image (GFile        *file,
       fclose (fp);
       return NULL;
     }
-
-  if (fseek(fp, 4, SEEK_SET) != 0)
+    if (fseek (fp, 4, SEEK_SET) != 0)
     {
       g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
                    _("Failed to seek to Dpx image dimensions"));
       fclose (fp);
       return NULL;
     }
+
+    /* This is in ASCII, not U32 */
+    if (fseek (fp, 8, SEEK_SET) != 0)
+    {
+      /*Version number of header format*/
+      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   _("Failed to seek version number of header"));
+      fclose (fp);
+      return NULL;
+    }
+
+    if (fseek (fp, 16, SEEK_SET) != 0)
+    {
+      /* Total image file size in bytes */
+      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   _("Failed to seek image file size"));
+      fclose (fp);
+      return NULL;
+    }
+
   if (! fread (&width, sizeof (guint32), 1, fp) ||
       ! fread (&height, sizeof (guint32), 1, fp))
     {
@@ -258,6 +275,40 @@ load_image (GFile        *file,
     }
 
   buffer = gimp_drawable_get_buffer (GIMP_DRAWABLE (layer));
+
+  if (fseek (fp, 768, SEEK_SET) != 0)
+    {
+      /* Image header: image orientation */
+      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   _("Failed to seek image orientation"));
+      fclose (fp);
+      return NULL;
+    }
+    if (fseek (fp, 770, SEEK_SET) != 0)
+    {
+      /* Image header: number of image elements */
+      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   _("Failed to seek number of image elements"));
+      fclose (fp);
+      return NULL;
+    }
+    if (fseek (fp, 772, SEEK_SET) != 0)
+    {
+      /* Image header: pixels per line */
+      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   _("Failed to seek pixels per line"));
+      fclose (fp);
+      return NULL;
+    }
+    if (fseek (fp, 776, SEEK_SET) != 0)
+    {
+      /* Image header: lines per image element */
+      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   _("Failed to seek lines per image element"));
+      fclose (fp);
+      return NULL;
+    }
+
   for (gint i = 0; i < height; i++)
     {
       if (! fread (pixels, row_size, 1, fp))
@@ -278,6 +329,5 @@ load_image (GFile        *file,
 
   fclose (fp);
   g_object_unref (buffer);
-*/
   return image;
 }
