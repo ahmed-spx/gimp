@@ -184,9 +184,11 @@ load_image (GFile        *file,
   guchar      magic_number[4];
   guint32     width;
   guint32     height;
+  guint32     data_offset;
   gsize       row_size;
   const Babl *format = babl_format ("R'G'B'A u16");
   FILE       *fp;
+  gsize      file_size = 0;
 
   fp = g_fopen (g_file_peek_path (file), "rb");
 
@@ -199,6 +201,10 @@ load_image (GFile        *file,
     }
 
   /* Load the header */
+  if (fseek(fp, 0, SEEK_END) == 0) {
+    file_size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+  }
   if (! fread (magic_number, 4, 1, fp))
     {
       g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
@@ -206,6 +212,14 @@ load_image (GFile        *file,
       fclose (fp);
       return NULL;
     }
+    if (! fread (&data_offset, sizeof(guint32), 1, fp)){
+      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   _("Failed to read Dpx offset"));
+      fclose (fp);
+      return NULL;
+    }
+    data_offset = GUINT32_FROM_BE(data_offset);
+
     if (fseek (fp, 4, SEEK_SET) != 0)
     {
       g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
@@ -232,6 +246,7 @@ load_image (GFile        *file,
       fclose (fp);
       return NULL;
     }
+    fseek(fp, 772, SEEK_SET);
 
   if (! fread (&width, sizeof (guint32), 1, fp) ||
       ! fread (&height, sizeof (guint32), 1, fp))
@@ -244,6 +259,11 @@ load_image (GFile        *file,
 
   width = GUINT32_FROM_BE (width);
   height = GUINT32_FROM_BE (height);
+
+
+  /* Debug print values */
+  g_message("DPX DEBUG: width=%u, height=%u\n", width, height);
+  g_message("DPX DEBUG: data_offset=%u\n", data_offset);
 
   if (width > GIMP_MAX_IMAGE_SIZE  ||
       height > GIMP_MAX_IMAGE_SIZE ||
@@ -258,7 +278,10 @@ load_image (GFile        *file,
 
   image = gimp_image_new_with_precision (width, height, GIMP_RGB,
                                          GIMP_PRECISION_U16_NON_LINEAR);
-
+/* Debug print values */
+  g_message("DPX DEBUG: row_size=%" G_GSIZE_FORMAT "\n", row_size);
+  g_message("DPX DEBUG: file_size=%" G_GSIZE_FORMAT "\n", file_size);
+  g_message("DPX DEBUG: expected pixel bytes=%" G_GSIZE_FORMAT "\n", row_size * height);
   layer = gimp_layer_new (image, _("Background"), width, height,
                           GIMP_RGBA_IMAGE, 100,
                           gimp_image_get_default_new_layer_mode (image));
@@ -308,6 +331,13 @@ load_image (GFile        *file,
       fclose (fp);
       return NULL;
     }
+    if (fseek (fp, data_offset, SEEK_SET) != 0)
+    {
+      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   _("Failed to seek to Dpx pixel data"));
+      fclose (fp);
+      return NULL;
+    }
 
   for (gint i = 0; i < height; i++)
     {
@@ -317,6 +347,8 @@ load_image (GFile        *file,
                        _("Premature end of Dpx pixel data"));
           return NULL;
         }
+        /* Debug print values */
+          g_message("DPX DEBUG: fread failed at row %d\n", i);
 
       for (gint j = 0; j < (width * 4); j++)
         pixels[j] = GUINT16_FROM_BE (pixels[j]);
