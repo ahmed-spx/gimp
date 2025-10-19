@@ -186,7 +186,9 @@ load_image (GFile        *file,
   guint32     height;
   guint32     data_offset;
   gsize       row_size;
-  const Babl *format = babl_format ("R'G'B'A u16");
+  //CHANGE
+  const Babl *format = NULL;
+  guint16    num_of_elements = 0;
   FILE       *fp;
   gsize      file_size = 0;
 
@@ -259,15 +261,39 @@ load_image (GFile        *file,
 
   width = GUINT32_FROM_BE (width);
   height = GUINT32_FROM_BE (height);
+//CHANGE
+  if (fseek (fp, 770, SEEK_SET) != 0)
+    {
+      //Seek to number of elements
+      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   _("Failed to seek image number of elements"));
+      fclose (fp);
+      return NULL;
+    }
+    fread(&num_of_elements, sizeof(guint16), 1, fp);
+    num_of_elements = GUINT16_FROM_BE(num_of_elements);
+  if (num_of_elements < 1 || num_of_elements > 4) {
+    g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   _("Incorrect image element count"));
+      fclose (fp);
+      return NULL;
+  }
+  switch (num_of_elements) {
+    case 1: format = babl_format ("Y u16"); break;
+    case 3: format = babl_format ("R'G'B' u16"); break;
+    case 4: format = babl_format ("R'G'B'A u16"); break;
+    default: format = babl_format ("R'G'B'A u16"); break;
+  }
 
 
   /* Debug print values */
   g_message("DPX DEBUG: width=%u, height=%u\n", width, height);
   g_message("DPX DEBUG: data_offset=%u\n", data_offset);
+  g_message("DPX DEBUG: number of elements=%u\n", num_of_elements);
 
   if (width > GIMP_MAX_IMAGE_SIZE  ||
       height > GIMP_MAX_IMAGE_SIZE ||
-      ! g_size_checked_mul (&row_size, width, (sizeof (guint16) * 4)))
+      ! g_size_checked_mul (&row_size, width, (sizeof (guint16) * num_of_elements)))
     {
       g_set_error (error, GIMP_PLUG_IN_ERROR, 0,
                    _("Image dimensions too large: width %d x height %d"),
@@ -276,12 +302,13 @@ load_image (GFile        *file,
       return NULL;
     }
 
-  image = gimp_image_new_with_precision (width, height, GIMP_RGB,
-                                         GIMP_PRECISION_U16_NON_LINEAR);
-/* Debug print values */
+    /* Debug print values */
   g_message("DPX DEBUG: row_size=%" G_GSIZE_FORMAT "\n", row_size);
   g_message("DPX DEBUG: file_size=%" G_GSIZE_FORMAT "\n", file_size);
   g_message("DPX DEBUG: expected pixel bytes=%" G_GSIZE_FORMAT "\n", row_size * height);
+
+  image = gimp_image_new_with_precision (width, height, GIMP_RGB,
+                                         GIMP_PRECISION_U16_NON_LINEAR);
   layer = gimp_layer_new (image, _("Background"), width, height,
                           GIMP_RGBA_IMAGE, 100,
                           gimp_image_get_default_new_layer_mode (image));
@@ -345,12 +372,13 @@ load_image (GFile        *file,
         {
           g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
                        _("Premature end of Dpx pixel data"));
+                       g_free (pixels);
+                       fclose (fp);
           return NULL;
         }
-        /* Debug print values */
-          g_message("DPX DEBUG: fread failed at row %d\n", i);
 
-      for (gint j = 0; j < (width * 4); j++)
+
+      for (gint j = 0; j < (width * num_of_elements); j++)
         pixels[j] = GUINT16_FROM_BE (pixels[j]);
 
       gegl_buffer_set (buffer,
