@@ -180,7 +180,7 @@ load_image (GFile        *file,
   GimpImage  *image  = NULL;
   GimpLayer  *layer;
   GeglBuffer *buffer;
-  guint16    *pixels;
+  guchar    *pixels;
   guchar      magic_number[4];
   guint32     width;
   guint32     height;
@@ -213,6 +213,23 @@ load_image (GFile        *file,
       fclose (fp);
       return NULL;
     }
+    if(fread(&pixel_data_offset_be, sizeof(guint32), 1, fp) != 1)
+    {
+      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   _("Failed to read Dpx pixel data offset"));
+      fclose (fp);
+      return NULL;
+    }
+
+    pixel_data_offset = GUINT32_FROM_BE (pixel_data_offset_be);
+
+    if(fseek(fp, (long)pixel_data_offset, SEEK_SET) != 0)
+    {
+      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   _("Failed to seek to Dpx pixel data"));
+      fclose (fp);
+      return NULL;
+    }
 
     /* This is in ASCII, not U32 */
     if (fseek (fp, 8, SEEK_SET) != 0)
@@ -238,6 +255,39 @@ load_image (GFile        *file,
     {
       g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
                    _("Failed to read Dpx image dimensions"));
+      fclose (fp);
+      return NULL;
+    }
+
+    if (fseek (fp, 768, SEEK_SET) != 0)
+    {
+      /* Image header: image orientation */
+      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   _("Failed to seek image orientation"));
+      fclose (fp);
+      return NULL;
+    }
+    if (fseek (fp, 770, SEEK_SET) != 0)
+    {
+      /* Image header: number of image elements */
+      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   _("Failed to seek number of image elements"));
+      fclose (fp);
+      return NULL;
+    }
+    if (fseek (fp, 772, SEEK_SET) != 0)
+    {
+      /* Image header: pixels per line */
+      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   _("Failed to seek pixels per line"));
+      fclose (fp);
+      return NULL;
+    }
+    if (fseek (fp, 776, SEEK_SET) != 0)
+    {
+      /* Image header: lines per image element */
+      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   _("Failed to seek lines per image element"));
       fclose (fp);
       return NULL;
     }
@@ -275,39 +325,6 @@ load_image (GFile        *file,
     }
 
   buffer = gimp_drawable_get_buffer (GIMP_DRAWABLE (layer));
-
-  if (fseek (fp, 768, SEEK_SET) != 0)
-    {
-      /* Image header: image orientation */
-      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
-                   _("Failed to seek image orientation"));
-      fclose (fp);
-      return NULL;
-    }
-    if (fseek (fp, 770, SEEK_SET) != 0)
-    {
-      /* Image header: number of image elements */
-      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
-                   _("Failed to seek number of image elements"));
-      fclose (fp);
-      return NULL;
-    }
-    if (fseek (fp, 772, SEEK_SET) != 0)
-    {
-      /* Image header: pixels per line */
-      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
-                   _("Failed to seek pixels per line"));
-      fclose (fp);
-      return NULL;
-    }
-    if (fseek (fp, 776, SEEK_SET) != 0)
-    {
-      /* Image header: lines per image element */
-      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
-                   _("Failed to seek lines per image element"));
-      fclose (fp);
-      return NULL;
-    }
 
   for (gint i = 0; i < height; i++)
     {
