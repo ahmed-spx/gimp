@@ -206,6 +206,10 @@ load_image (GFile        *file,
       fclose (fp);
       return NULL;
     }
+
+    guint32 pixel_data_offset;
+    guint32 pixel_data_offset_be;
+
     if (fseek (fp, 4, SEEK_SET) != 0)
     {
       g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
@@ -213,6 +217,7 @@ load_image (GFile        *file,
       fclose (fp);
       return NULL;
     }
+
     if(fread(&pixel_data_offset_be, sizeof(guint32), 1, fp) != 1)
     {
       g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
