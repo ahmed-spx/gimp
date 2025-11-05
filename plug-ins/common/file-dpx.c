@@ -214,6 +214,9 @@ load_image (GFile        *file,
       fclose (fp);
       return NULL;
     }
+
+
+
     if (! fread (&data_offset, sizeof(guint32), 1, fp)){
       g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
                    _("Failed to read Dpx offset"));
@@ -221,14 +224,6 @@ load_image (GFile        *file,
       return NULL;
     }
     data_offset = GUINT32_FROM_BE(data_offset);
-
-    if (fseek (fp, 4, SEEK_SET) != 0)
-    {
-      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
-                   _("Failed to seek to Dpx image dimensions"));
-      fclose (fp);
-      return NULL;
-    }
 
     /* This is in ASCII, not U32 */
     if (fseek (fp, 8, SEEK_SET) != 0)
@@ -240,14 +235,8 @@ load_image (GFile        *file,
       return NULL;
     }
 
-    if (fseek (fp, 16, SEEK_SET) != 0)
-    {
-      /* Total image file size in bytes */
-      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
-                   _("Failed to seek image file size"));
-      fclose (fp);
-      return NULL;
-    }
+    /* Get orientation/number of layers here, rather than skipping it */
+
     fseek(fp, 772, SEEK_SET);
 
   if (! fread (&width, sizeof (guint32), 1, fp) ||
@@ -278,6 +267,7 @@ load_image (GFile        *file,
       fclose (fp);
       return NULL;
   }
+  /* Double-check if correct */
   switch (num_of_elements) {
     case 1: format = babl_format ("Y u16"); break;
     case 3: format = babl_format ("R'G'B' u16"); break;
@@ -286,14 +276,14 @@ load_image (GFile        *file,
   }
 
 
-  /* Debug print values */
+  // Debug print values
   g_message("DPX DEBUG: width=%u, height=%u\n", width, height);
   g_message("DPX DEBUG: data_offset=%u\n", data_offset);
   g_message("DPX DEBUG: number of elements=%u\n", num_of_elements);
 
   if (width > GIMP_MAX_IMAGE_SIZE  ||
       height > GIMP_MAX_IMAGE_SIZE ||
-      ! g_size_checked_mul (&row_size, width, (sizeof (guint16) * num_of_elements)))
+      ! g_size_checked_mul (&row_size, width, 4))
     {
       g_set_error (error, GIMP_PLUG_IN_ERROR, 0,
                    _("Image dimensions too large: width %d x height %d"),
@@ -302,7 +292,7 @@ load_image (GFile        *file,
       return NULL;
     }
 
-    /* Debug print values */
+    // Debug print values
   g_message("DPX DEBUG: row_size=%" G_GSIZE_FORMAT "\n", row_size);
   g_message("DPX DEBUG: file_size=%" G_GSIZE_FORMAT "\n", file_size);
   g_message("DPX DEBUG: expected pixel bytes=%" G_GSIZE_FORMAT "\n", row_size * height);
@@ -326,38 +316,6 @@ load_image (GFile        *file,
 
   buffer = gimp_drawable_get_buffer (GIMP_DRAWABLE (layer));
 
-  if (fseek (fp, 768, SEEK_SET) != 0)
-    {
-      /* Image header: image orientation */
-      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
-                   _("Failed to seek image orientation"));
-      fclose (fp);
-      return NULL;
-    }
-    if (fseek (fp, 770, SEEK_SET) != 0)
-    {
-      /* Image header: number of image elements */
-      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
-                   _("Failed to seek number of image elements"));
-      fclose (fp);
-      return NULL;
-    }
-    if (fseek (fp, 772, SEEK_SET) != 0)
-    {
-      /* Image header: pixels per line */
-      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
-                   _("Failed to seek pixels per line"));
-      fclose (fp);
-      return NULL;
-    }
-    if (fseek (fp, 776, SEEK_SET) != 0)
-    {
-      /* Image header: lines per image element */
-      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
-                   _("Failed to seek lines per image element"));
-      fclose (fp);
-      return NULL;
-    }
     if (fseek (fp, data_offset, SEEK_SET) != 0)
     {
       g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
