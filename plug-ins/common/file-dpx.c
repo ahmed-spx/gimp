@@ -183,8 +183,11 @@ load_image (GFile        *file,
   //Change
   guchar    *pixels;
   guchar      magic_number[4];
+  ASCII       version[8];
   guint32     width;
   guint32     height;
+  guint32     pixel_data_offset;
+  guint32     pixel_data_offset_be;
   gsize       row_size;
   const Babl *format = babl_format ("R'G'B'A u8");
   FILE       *fp;
@@ -199,38 +202,12 @@ load_image (GFile        *file,
       return NULL;
     }
 
-  /* Load the header */
+    //fread of magic number
+    //5.1 field 1
   if (! fread (magic_number, 4, 1, fp))
     {
       g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
                    _("Failed to read Dpx header"));
-      fclose (fp);
-      return NULL;
-    }
-
-  if (fseek(fp, 4, SEEK_SET) != 0)
-    {
-      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
-                   _("Failed to seek to Dpx image dimensions"));
-      fclose (fp);
-      return NULL;
-    }
-
-    /* This is in ASCII, not U32 */
-    if (fseek (fp, 8, SEEK_SET) != 0)
-    {
-      /*Version number of header format*/
-      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
-                   _("Failed to seek version number of header"));
-      fclose (fp);
-      return NULL;
-    }
-
-    if (fseek (fp, 16, SEEK_SET) != 0)
-    {
-      /* Total image file size in bytes */
-      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
-                   _("Failed to seek image file size"));
       fclose (fp);
       return NULL;
     }
@@ -258,7 +235,6 @@ load_image (GFile        *file,
       fclose (fp);
       return NULL;
     }
-
     //Change
   image = gimp_image_new_with_precision (width, height, GIMP_RGB,
                                          GIMP_PRECISION_U8_NON_LINEAR);
@@ -279,10 +255,6 @@ load_image (GFile        *file,
     }
 
   //Trying to jump to offset 4, and read the pixel image offset from there
-guint32 pixel_data_offset;
-guint32 pixel_data_offset_be;
-
-
     if (fseek(fp, 4, SEEK_SET) != 0)
     {
       g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
@@ -290,6 +262,8 @@ guint32 pixel_data_offset_be;
       fclose (fp);
       return NULL;
     }
+    //fread of data offset
+    //5.1 field 2
     if(fread(&pixel_data_offset_be, sizeof(guint32), 1, fp) != 1)
     {
       g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
@@ -300,12 +274,20 @@ guint32 pixel_data_offset_be;
 
   pixel_data_offset = GUINT32_FROM_BE (pixel_data_offset_be);
 
+    //fread of version
+    //5.1 field 3
+  if (! fread (version, 8, 1, fp))
+    {
+      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   _("Failed to read Dpx version"));
+      fclose (fp);
+      return NULL;
+    }
 
      if(fseek(fp, (long)pixel_data_offset, SEEK_SET) != 0)
     {
       g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
                    _("Failed to seek to Dpx pixel data"));
->>>>>>> Brian-DPX-edit
       fclose (fp);
       return NULL;
     }
