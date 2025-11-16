@@ -54,8 +54,8 @@ struct _DpxClass
 
 #define DPX_TYPE  (dpx_get_type ())
 #define DPX(obj) (G_TYPE_CHECK_INSTANCE_CAST ((obj), DPX_TYPE, Dpx))
-#define ASCII(obj) (G_TYPE_CHECK_INSTANCE_CAST ((obj), ASCII_TYPE, Ascii))
-typedef char ASCII
+//#define ASCII(obj) (G_TYPE_CHECK_INSTANCE_CAST ((obj), ASCII_TYPE, Ascii))
+//typedef char ASCII;
 
 GType                   dpx_get_type         (void) G_GNUC_CONST;
 
@@ -189,7 +189,7 @@ load_image (GFile        *file,
   guint32     height;
   guint32     pixel_data_offset;
   guint32     pixel_data_offset_be;
-  ASCII       version[8];
+  //ASCII       version[8];
   guint32     file_size;
   gsize       row_size;
   const Babl *format = babl_format ("R'G'B'A u8");
@@ -277,15 +277,17 @@ load_image (GFile        *file,
 
     pixel_data_offset = GUINT32_FROM_BE (pixel_data_offset_be);
 
+    /*
     //fread of version
     //5.1 field 3
-    if (! fread (version[8], 8, 1, fp))
+    if (! fread (version, 8, 1, fp))
     {
       g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
                    _("Failed to read Dpx version"));
       fclose (fp);
       return NULL;
     }
+    */
 
     //fread of version
     //5.1 field 3
