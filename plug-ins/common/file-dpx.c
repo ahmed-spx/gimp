@@ -185,11 +185,12 @@ load_image (GFile        *file,
   //Change
   guchar    *pixels;
   guchar      magic_number[4];
-  ASCII       version[8];
   guint32     width;
   guint32     height;
   guint32     pixel_data_offset;
   guint32     pixel_data_offset_be;
+  ASCII       version[8];
+  guint32     file_size;
   gsize       row_size;
   const Babl *format = babl_format ("R'G'B'A u8");
   FILE       *fp;
@@ -256,7 +257,7 @@ load_image (GFile        *file,
       return NULL;
     }
 
-  //Trying to jump to offset 4, and read the pixel image offset from there
+    //Trying to jump to offset 4, and read the pixel image offset from there
     if (fseek(fp, 4, SEEK_SET) != 0)
     {
       g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
@@ -274,11 +275,11 @@ load_image (GFile        *file,
       return NULL;
     }
 
-  pixel_data_offset = GUINT32_FROM_BE (pixel_data_offset_be);
+    pixel_data_offset = GUINT32_FROM_BE (pixel_data_offset_be);
 
     //fread of version
     //5.1 field 3
-  if (! fread (version[8], 8, 1, fp))
+    if (! fread (version[8], 8, 1, fp))
     {
       g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
                    _("Failed to read Dpx version"));
@@ -286,7 +287,19 @@ load_image (GFile        *file,
       return NULL;
     }
 
-     if(fseek(fp, (long)pixel_data_offset, SEEK_SET) != 0)
+    //fread of version
+    //5.1 field 3
+    if (! fread (file_size, 4, 1, fp))
+    {
+      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   _("Failed to read Dpx file size"));
+      fclose (fp);
+      return NULL;
+    }
+
+    file_size = GUINT32_FROM_BE(file_size);
+
+    if(fseek(fp, (long)pixel_data_offset, SEEK_SET) != 0)
     {
       g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
                    _("Failed to seek to Dpx pixel data"));
