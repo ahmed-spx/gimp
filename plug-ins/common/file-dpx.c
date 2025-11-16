@@ -34,6 +34,7 @@
 
 
 #define LOAD_PROC      "file-dpx-load"
+#define SAVE_PROC      "file-dpx-save"
 #define PLUG_IN_BINARY "file-dpx"
 #define PLUG_IN_ROLE   "gimp-file-dpx"
 
@@ -70,9 +71,25 @@ static GimpValueArray * dpx_load             (GimpProcedure         *procedure,
                                               GimpProcedureConfig   *config,
                                               gpointer               run_data);
 
+static GimpValueArray * dpx_save             (GimpProcedure         *procedure,
+                                              GimpRunMode            run_mode,
+                                              GimpImage             *image,
+                                              gint                   n_drawables,
+                                              GimpDrawable         **drawables,
+                                              GFile                 *file,
+                                              GimpMetadata          *metadata,
+                                              GimpProcedureConfig   *config,
+                                              gpointer               run_data);
+
 static GimpImage      * load_image            (GFile                 *file,
                                                GObject               *config,
                                                GimpRunMode            run_mode,
+                                               GError               **error);
+
+static gboolean         save_image            (GFile                 *file,
+                                               GimpImage             *image,
+                                               GimpDrawable          *drawable,
+                                               GObject               *config,
                                                GError               **error);
 
 G_DEFINE_TYPE (Dpx, dpx, GIMP_TYPE_PLUG_IN)
@@ -102,6 +119,7 @@ dpx_query_procedures (GimpPlugIn *plug_in)
   GList *list = NULL;
 
   list = g_list_append (list, g_strdup (LOAD_PROC));
+  list = g_list_append (list, g_strdup (SAVE_PROC));
 
   return list;
 }
@@ -137,6 +155,30 @@ dpx_create_procedure (GimpPlugIn  *plug_in,
       gimp_file_procedure_set_magics (GIMP_FILE_PROCEDURE (procedure),
                                       "0,string,SDPX");
     }
+  else if (! strcmp (name, SAVE_PROC))
+    {
+      procedure = gimp_save_procedure_new (plug_in, name,
+                                           GIMP_PDB_PROC_TYPE_PLUGIN,
+                                           dpx_save, NULL, NULL);
+
+      gimp_procedure_set_image_types (procedure, "RGB*, GRAY*");
+
+      gimp_procedure_set_menu_label (procedure,
+                                     _("DPX"));
+
+      gimp_procedure_set_documentation (procedure,
+                                        _("Save file in the Dpx file format"),
+                                        _("Save file in the Dpx file format"),
+                                        name);
+      gimp_procedure_set_attribution (procedure,
+                                      "Ahmed A., Brian J., Domingo, Jax G.",
+                                      "Copyright 2025",
+                                      "Gimp 3.1");
+
+      gimp_file_procedure_set_extensions (GIMP_FILE_PROCEDURE (procedure),
+                                          "dpx")
+
+    }
   return procedure;
 }
 
@@ -169,6 +211,63 @@ dpx_load (GimpProcedure         *procedure,
   GIMP_VALUES_SET_IMAGE (return_vals, 1, image);
 
   return return_vals;
+}
+
+static GimpValueArray *
+dpx_save (GimpProcedure         *procedure,
+          GimpRunMode            run_mode,
+          GimpImage             *image,
+          gint                   n_drawables,
+          GimpDrawable         **drawables,
+          GFile                 *file,
+          GimpMetadata          *metadata,
+          GimpProcedureConfig   *config,
+          gpointer               run_data)
+{
+  GimpPDBStatusType  status = GIMP_PDB_SUCCESS;
+  GimpExportReturn   export = GIMP_EXPORT_IGNORE;
+  GError            *error  = NULL;
+
+  gegl_init (NULL, NULL);
+
+  if (run_mode == GIMP_RUN_INTERACTIVE)
+    {
+      gimp_ui_init (PLUG_IN_BINARY);
+
+      export = gimp_export_image (&image, &n_drawables, &drawables, "DPX",
+                                  GIMP_EXPORT_CAN_HANDLE_RGB |
+                                  GIMP_EXPORT_CAN_HANDLE_GRAY |
+                                  GIMP_EXPORT_CAN_HANDLE_ALPHA);
+
+      if (export == GIMP_EXPORT_CANCEL)
+        return gimp_procedure_new_return_values (procedure,
+                                                 GIMP_PDB_CANCEL,
+                                                 NULL);
+    }
+
+  if (n_drawables != 1)
+    {
+      g_set_error (&error, G_FILE_ERROR, 0,
+                   _("DPX format does not support multiple layers."));
+
+      return gimp_procedure_new_return_values (procedure,
+                                               GIMP_PDB_CALLING_ERROR,
+                                               error);
+    }
+
+  if (! save_image (file, image, drawables[0],
+                    G_OBJECT (config), &error))
+    {
+      status = GIMP_PDB_EXECUTION_ERROR;
+    }
+
+  if (export == GIMP_EXPORT_EXPORT)
+    {
+      gimp_image_delete (image);
+      g_free (drawables);
+    }
+
+  return gimp_procedure_new_return_values (procedure, status, error);
 }
 
 static GimpImage *
@@ -348,4 +447,35 @@ load_image (GFile        *file,
   fclose (fp);
   g_object_unref (buffer);
   return image;
+}
+
+static gboolean
+save_image (GFile        *file,
+            GimpImage    *image,
+            GimpDrawable *drawable,
+            GObject      *config,
+            GError      **error)
+{
+  FILE          *fp;
+  gint           width, height;
+  GimpImageType  drawable_type;
+
+  drawable_type = gimp_drawable_type (drawable);
+  width  = gimp_drawable_get_width  (drawable);
+  height = gimp_drawable_get_height (drawable);
+
+  /* Open file for writing */
+  fp = g_fopen (g_file_peek_path (file), "wb");
+  if (! fp)
+    {
+      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   _("Could not open '%s' for writing: %s"),
+                   gimp_file_get_utf8_name (file), g_strerror (errno));
+      return FALSE;
+    }
+
+  /*ADD ACTUAL WRITING LOGIC HERE*/
+
+  fclose (fp);
+  return TRUE;
 }
