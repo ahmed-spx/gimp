@@ -269,6 +269,8 @@ load_image (GFile        *file,
       fclose (fp);
       return NULL;
     }
+
+
     //fread of data offset
     //5.1 field 2
     if(fread(&pixel_data_offset_be, sizeof(guint32), 1, fp) != 1)
@@ -291,6 +293,7 @@ load_image (GFile        *file,
       fclose (fp);
       return NULL;
     }
+    version = GUINT32_FROM_BE(version);
 
 
     //fread of version
@@ -302,7 +305,6 @@ load_image (GFile        *file,
       fclose (fp);
       return NULL;
     }
-
     file_size = GUINT32_FROM_BE(file_size);
 
     /*
