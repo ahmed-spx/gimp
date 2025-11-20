@@ -323,6 +323,7 @@ load_image (GFile        *file,
   {
     g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
                 _("Failed to seek to Dpx image orientation"));
+    g_free (pixels);
     fclose (fp);
     return NULL;
   }
@@ -334,6 +335,7 @@ load_image (GFile        *file,
   {
     g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
                 _("Failed to read Dpx image orientation"));
+    g_free (pixels);
     fclose (fp);
     return NULL;
   }
@@ -346,6 +348,7 @@ load_image (GFile        *file,
   {
     g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
                 _("Failed to read Dpx number of image elements"));
+    g_free (pixels);
     fclose (fp);
     return NULL;
   }
@@ -358,6 +361,7 @@ load_image (GFile        *file,
   {
     g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
                 _("Failed to read Dpx pixels per line"));
+    g_free (pixels);
     fclose (fp);
     return NULL;
   }
@@ -370,32 +374,14 @@ load_image (GFile        *file,
   {
     g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
                 _("Failed to read Dpx image elements per line"));
+    g_free (pixels);
     fclose (fp);
     return NULL;
   }
   element_lines = GUINT32_FROM_BE (element_lines);
 
-  /*
-  for (gint i = 0; i < height; i++)
-    {
-      if (! fread (pixels, row_size, 1, fp))
-        {
-          g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
-                       _("Premature end of Dpx pixel data"));
-          return NULL;
-        }
-
-      for (gint j = 0; j < (width * 4); j++)
-        pixels[j] = GUINT16_FROM_BE (pixels[j]);
-
-      gegl_buffer_set (buffer,
-                       GEGL_RECTANGLE (0, i, width, 1), 0,
-                       format, pixels, GEGL_AUTO_ROWSTRIDE);
-    }
-  g_free (pixels);
-  */
-
   fclose (fp);
+  g_free (pixels);
   g_object_unref (buffer);
 
   return image;
