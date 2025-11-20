@@ -189,8 +189,12 @@ load_image (GFile        *file,
   guint32     height;
   guint32     pixel_data_offset;
   guint32     pixel_data_offset_be;
-  //ASCII       version[8];
+  ASCII       version[8];
   guint32     file_size;
+  guint16     image_orientation;
+  guint16     num_image_elements;
+  guint32     pixel_lines;
+  guint32     element_lines;
   gsize       row_size;
   const Babl *format = babl_format ("R'G'B'A u8");
   FILE       *fp;
@@ -277,7 +281,7 @@ load_image (GFile        *file,
 
     pixel_data_offset = GUINT32_FROM_BE (pixel_data_offset_be);
 
-    /*
+
     //fread of version
     //5.1 field 3
     if (! fread (version, 8, 1, fp))
@@ -287,7 +291,7 @@ load_image (GFile        *file,
       fclose (fp);
       return NULL;
     }
-    */
+
 
     //fread of version
     //5.1 field 3
@@ -301,6 +305,7 @@ load_image (GFile        *file,
 
     file_size = GUINT32_FROM_BE(file_size);
 
+    /*
     if(fseek(fp, (long)pixel_data_offset, SEEK_SET) != 0)
     {
       g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
@@ -308,7 +313,67 @@ load_image (GFile        *file,
       fclose (fp);
       return NULL;
     }
+    */
 
+
+   // Jump to offset 768 to read image orientation
+  if (fseek(fp, 768, SEEK_SET) != 0)
+  {
+    g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                _("Failed to seek to Dpx image orientation"));
+    fclose (fp);
+    return NULL;
+  }
+
+
+  //fread of image orientation
+  //5.2 field 17
+  if (! fread (&image_orientation, sizeof (guint16), 1, fp))
+  {
+    g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                _("Failed to read Dpx image orientation"));
+    fclose (fp);
+    return NULL;
+  }
+  image_orientation = GUINT16_FROM_BE (image_orientation);
+
+
+  //fread of number of image elements
+  //5.2 field 18
+  if (! fread (&num_image_elements, sizeof (guint16), 1, fp))
+  {
+    g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                _("Failed to read Dpx number of image elements"));
+    fclose (fp);
+    return NULL;
+  }
+  num_image_elements = GUINT16_FROM_BE (num_image_elements);
+
+
+  //fread of pixel per line
+  //5.2 field 19
+  if (! fread (&pixel_lines, sizeof (guint32), 1, fp))
+  {
+    g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                _("Failed to read Dpx pixels per line"));
+    fclose (fp);
+    return NULL;
+  }
+  pixel_lines = GUINT32_FROM_BE (pixel_lines);
+
+
+  //fread of element per line
+  //5.2 field 20
+  if (! fread (&element_lines, sizeof (guint32), 1, fp))
+  {
+    g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                _("Failed to read Dpx image elements per line"));
+    fclose (fp);
+    return NULL;
+  }
+  element_lines = GUINT32_FROM_BE (element_lines);
+
+  /*
   for (gint i = 0; i < height; i++)
     {
       if (! fread (pixels, row_size, 1, fp))
@@ -326,6 +391,7 @@ load_image (GFile        *file,
                        format, pixels, GEGL_AUTO_ROWSTRIDE);
     }
   g_free (pixels);
+  */
 
   fclose (fp);
   g_object_unref (buffer);
